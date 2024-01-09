@@ -1,0 +1,19 @@
+{; :sonarr/url ""
+ ; :sonarr/api ""
+ ; :radarr/url ""
+ ; :radarr/api ""
+ ; :overseerr/url ""
+ ; :overseerr/api ""
+ ; :telegram/token ""
+ ; -- Optional Settings
+ ; :partial-seasons false
+ ; :sonarr/quality-profile ""
+ ; :radarr/quality-profile ""
+ ; :radarr/rootfolder ""
+ ; :sonarrr/language-profile ""
+ ; :sonarr/rootfolder ""
+ ; :sonarr/season-folders true
+ ; :discord/max-results 10
+ ; :overseerr/default-id 1
+ ; :log-level :trace
+ }
