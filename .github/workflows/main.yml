@@ -31,7 +31,7 @@ jobs:
         shell: bash
         run: |
           clojure -T:build uber
-          cp target/doplarr.jar docker
+          cp target/teledoplarr.jar docker
 
       - name: Release tagged version
         uses: softprops/action-gh-release@v1
@@ -39,7 +39,7 @@ jobs:
         with:
           token: ${{ secrets.RELEASE_TOKEN }}
           files: |
-            target/doplarr.jar
+            target/teledoplarr.jar
             config.edn
 
       - name: Log in to the Container registry
