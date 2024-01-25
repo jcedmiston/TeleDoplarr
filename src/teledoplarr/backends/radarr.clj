@@ -36,6 +36,8 @@
          (= 1 (count rootfolders)) (:id (first rootfolders))
          :else rootfolders)})))
 
+(defn details [id media-type])
+
 (defn request-embed [{:keys [title quality-profile-id tmdb-id rootfolder-id]} _]
   (a/go
     (let [rootfolders (a/<! (impl/rootfolders))

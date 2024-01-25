@@ -100,17 +100,17 @@
                      (into [])))
          (else #(fatal % "Exception on querying Overseerr users")))))
 
-(defn discord-id [ovsr-id]
+(defn telegram-id [ovsr-id]
   (a/go
     (->> (a/<! (GET (str "/user/" ovsr-id)))
          (then #(->> (utils/from-camel %)
-                     (s/select-one [:body :settings :discord-id])))
-         (else #(fatal % "Exception on querying Overseerr discord id")))))
+                     (s/select-one [:body :settings :telegram-id])))
+         (else #(fatal % "Exception on querying Overseerr Telegram id")))))
 
-(defn discord-users []
+(defn telegram-users []
   (a/go-loop [ids (a/<! (all-users))
               users {}]
     (if (empty? ids)
       users
       (let [id (first ids)]
-        (recur (rest ids) (assoc users (a/<! (discord-id id)) id))))))
+        (recur (rest ids) (assoc users (a/<! (telegram-id id)) id))))))

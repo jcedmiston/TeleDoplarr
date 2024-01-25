@@ -26,8 +26,8 @@
     :overseerr/default-id
     ; Discord
     :telegram/token
-    :discord/max-results
-    :discord/requested-msg-style
+    :telegram/max-results
+    :telegram/requested-msg-style
     ; TeleDoplarr
     :partial-seasons
     :log-level})

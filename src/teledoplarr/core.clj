@@ -2,12 +2,11 @@
   (:require
    [clojure.core.async :as a]
    [clojure.string :as str]
-   [cheshire.core :refer :all]
    [config.core :refer [load-env]]
    [fmnoise.flow :refer [else then]]
    [telegrambot-lib.core :as t]
    [teledoplarr.config :as config]
-   [teledoplarr.telegram :as discord]
+   [teledoplarr.telegram :as telegram]
    [teledoplarr.interaction-state-machine :as ism]
    [teledoplarr.state :as state]
    [teledoplarr.utils :as utils :refer [log-on-error]]
@@ -27,7 +26,7 @@
   ([bot offset]
    (try
      (t/get-updates bot {:offset offset
-                            :timeout 10})
+                         :timeout 10})
 
      (catch Exception e
        (fatal "tbot/get-updates exception:" e)))))
@@ -41,11 +40,12 @@
     (cond
       (not (= nil text))
       (cond
-        (str/starts-with? text "/start") (ism/system-interaction! (discord/interaction-data msg nil) "I'm up and ready to accept requests!")
-        (str/starts-with? text "/help") (ism/system-interaction! (discord/interaction-data msg nil) "Use '/request_' commands to submit requests for new media. If you are using Overserr please make sure your Telegram ID has been added in your account settings.")
-        (str/starts-with? text "/movie") (ism/start-interaction! (discord/interaction-data msg :movie))
-        (str/starts-with? text "/series") (ism/start-interaction! (discord/interaction-data msg :series)))
-      :else (ism/continue-interaction! (discord/interaction-data msg nil)))))
+        (str/starts-with? text "/start") (ism/system-interaction! (telegram/interaction-data msg nil) "I'm up and ready to accept requests!")
+        (str/starts-with? text "/help") (ism/system-interaction! (telegram/interaction-data msg nil) "Use '/media' commands to submit requests for new media. If you are using Overserr please make sure your Telegram ID has been added in your account settings.")
+        (str/starts-with? text "/movie") (ism/start-interaction! (telegram/interaction-data msg :movie))
+        (str/starts-with? text "/series") (ism/start-interaction! (telegram/interaction-data msg :series)))
+      (contains? msg :callback_query) (ism/continue-interaction! (telegram/interaction-data msg nil))
+      :else (info (str "Unhandled message recieved: " msg)))))
 
 (defn app
   "Retrieve and process chat messages."
@@ -78,8 +78,8 @@
         bot (t/create token)
         media-types (config/available-media @state/config)
         init-state {:bot bot}]
-    (reset! state/discord init-state)
-    (discord/register-commands bot media-types)
+    (reset! state/telegram init-state)
+    (telegram/register-commands bot media-types)
     (app bot)))
 
 ; Program Entry Point

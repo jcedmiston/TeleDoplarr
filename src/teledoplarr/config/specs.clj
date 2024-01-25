@@ -17,8 +17,8 @@
 (spec/def :telegram/token string?)
 
 ;  --- Optional settings
-(spec/def :discord/max-results (spec/int-in 1 26))
-(spec/def :discord/requested-msg-style #{:none :plain :embed})
+(spec/def :telegram/max-results (spec/int-in 1 26))
+(spec/def :telegram/requested-msg-style #{:none :plain :embed})
 
 ; Radarr optionals
 (spec/def :radarr/quality-profile string?)
@@ -52,8 +52,8 @@ If you have configured one, make sure to check spelling. A valid configuration c
 ; Complete configuration
 (spec/def ::config (spec/and
                     (spec/keys :req [:telegram/token]
-                               :opt [:discord/max-results
-                                     :discord/requested-msg-style
+                               :opt [:telegram/max-results
+                                     :telegram/requested-msg-style
                                      :radarr/quality-profile
                                      :sonarr/quality-profile
                                      :sonarr/language-profile
