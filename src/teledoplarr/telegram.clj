@@ -7,7 +7,7 @@
    [teledoplarr.utils :as utils]
    [fmnoise.flow :as flow :refer [else]]
    [taoensso.timbre :refer [fatal info]]
-   [telegrambot-lib.core :as tbot]))
+   [telegrambot-lib.core :as t]))
 
 (def MAX-OPTIONS 25)
 (def MAX-CHARACTERS 100)
@@ -29,34 +29,28 @@
   {:text (apply str (take MAX-CHARACTERS label))
    :callback_data (str "option-page:" uuid ":" option "-" page)})
 
-(defn result_reply_markup [uuid index count]
-  (let [prev (if (= index 0) nil {:text "< Prev" :callback_data (str "prev-result:" uuid ":" (dec index))})
-        next (if (= index (dec count)) nil {:text "Next >" :callback_data (str "next-result:" uuid ":" (inc index))})]
+(defn result-reply-action-button [status uuid button-data]
+  (case status
+    :available [{:text "Open in Plex" :url button-data} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :pending [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :processing [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :unknown [{:text "Request" :callback_data (str "result-select:" uuid ":" button-data)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]
+    (nil) [{:text "Request" :callback_data (str "result-select:" uuid ":" button-data)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]))
+
+(defn result-reply-markup [uuid index count status plex-url?]
+  (let [action-button-data (if (nil? plex-url?) index plex-url?)
+        prev (if (= index 0) nil {:text "< Prev" :callback_data (str "change-result:" uuid ":" index "/-1")})
+        next (if (= index (dec count)) nil {:text "Next >" :callback_data (str "change-result:" uuid ":" index "/+1")})]
     (map (partial remove nil?) [[prev {:text "TMDB" :url "https://tmdb.org"} next]
-                                [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]])))
+                                (result-reply-action-button status uuid action-button-data)])))
 
-(defn select-option [uuid option-name index option]
+(defn select-option [uuid option-name option]
+  (let [id (-> option :id)]
   [{:text (apply str (take MAX-CHARACTERS (or (:title option) (:name option))))
-    :callback_data (str "option-select:" uuid ":" (name option-name) "-" index)}])
+    :callback_data (str "option-select:" uuid ":" (name option-name) "/" id)}]))
 
-(defn option-reply-markup [option options uuid page]
-  (generate-string {:inline_keyboard (map-indexed (partial select-option uuid option) options)}))
-
-(defn option-dropdown [option options uuid page]
-  (info option)
-  (info options)
-  (info page)
-  (let [all-options (map #(set/rename-keys % {:name :label :id :value}) options)
-        chunked (partition-all MAX-OPTIONS all-options)
-        ddown ((str "Which " (utils/canonical-option-name option) "?") (str "option-select:" uuid ":" (name option)))]
-    (info all-options)
-    (cond-> ddown
-      ; Create the action row if we have more than 1 chunk
-      (> (count chunked) 1) (update-in [:components] conj {:type 1 :components []})
-      ; More chunks exist
-      (< page (dec (count chunked))) (update-in [:components 1 :components] conj (page-button uuid (name option) (inc page) "More"))
-      ; Past chunk 1
-      (> page 0) (update-in [:components 1 :components] conj (page-button uuid (name option) (dec page) "Less")))))
+(defn option-reply-markup [option options uuid]
+  (generate-string {:inline_keyboard (map (partial select-option uuid option) options)}))
 
 (defn request-embed [{:keys [media-type title overview poster season quality-profile language-profile rootfolder]}]
   {:title title
@@ -85,7 +79,7 @@
        "` has been received!"))
 
 (defn request-performed-embed [payload med]
-  (str ))
+  (str))
 
 (defn request-commands [media-types]
   (generate-string (concat [{:command "start" :description "check if the bot is ready to respond."}
@@ -96,4 +90,19 @@
 
 (defn register-commands [bot media-types]
   (let [commands (request-commands media-types)]
-    (tbot/set-my-commands bot commands)))
+    (t/set-my-commands bot commands)))
+
+(defn status-pill [status]
+  (case status
+    :available "🟢 Available Now"
+    :partially-available "🟡 Partially Available"
+    :pending "🟡 Proccessing Request"
+    :processing "🟡 Proccessing Request"
+    :unknown "🔴 Not Yet Available"
+    nil "🔴 Not Yet Available"))
+
+(defn caption [result status index results-count]
+  (str (:title result) " ("
+       (:year result) ")\n"
+       (status-pill status) "\n\n"
+       (:overview result) "\n\n" index " of " results-count " results"))

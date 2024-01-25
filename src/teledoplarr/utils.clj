@@ -62,6 +62,11 @@
        first
        :name))
 
+(defn check-result [res]
+  (if (:ok res )
+    res
+    (ex-info "An error occured interacting with telegram" res)))
+
 (defmacro log-on-error [expr msg]
   `(try
      ~expr

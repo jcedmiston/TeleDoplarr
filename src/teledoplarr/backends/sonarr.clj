@@ -56,6 +56,8 @@
                         (= 1 (count rootfolders)) (:id (first rootfolders))
                         :else rootfolders)})))
 
+(defn details [id media-type])
+
 (defn request-embed [{:keys [title quality-profile-id language-profile-id tvdb-id season rootfolder-id]} _]
   (a/go
     (let [rootfolders (a/<! (impl/rootfolders))
