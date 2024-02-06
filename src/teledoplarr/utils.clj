@@ -62,8 +62,8 @@
        first
        :name))
 
-(defn check-result [res]
-  (if (:ok res )
+(defn check-response [res]
+  (if (:ok res)
     res
     (ex-info "An error occured interacting with telegram" res)))
 

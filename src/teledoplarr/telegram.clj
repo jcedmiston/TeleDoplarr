@@ -7,7 +7,8 @@
    [teledoplarr.utils :as utils]
    [fmnoise.flow :as flow :refer [else]]
    [taoensso.timbre :refer [fatal info]]
-   [telegrambot-lib.core :as t]))
+   [telegrambot-lib.core :as t]
+   [teledoplarr.state :as state]))
 
 (def MAX-OPTIONS 25)
 (def MAX-CHARACTERS 100)
@@ -18,11 +19,11 @@
 
 (defn interaction-data [interaction media-type]
   {:id (-> interaction :update_id)
-   :chat-id (if (contains? interaction :callback_query) (-> interaction :callback_query :message :chat :id) (-> interaction :message :chat :id))
+   :chat-id (get-in interaction [:callback_query :message :chat :id] (-> interaction :message :chat :id))
    :media-type media-type
-   :user-id (if (contains? interaction :callback_query) (-> interaction :callback_query :from :id) (-> interaction :message :from :id))
-   :msg-id (if (contains? interaction :callback_query) (-> interaction :callback_query :message :message_id) (-> interaction :message :message_id))
-   :msg-text (if (contains? interaction :callback_query) (-> interaction :callback_query :message :text) (str/replace (-> interaction :message :text) #"^\/[a-z_]+[ ]*" ""))
+   :user-id (get-in interaction [:callback_query :from :id] (-> interaction :message :from :id))
+   :msg-id (get-in interaction [:callback_query :message :message_id] (-> interaction :message :message_id))
+   :msg-text (if (contains? interaction :message) (str/replace (-> interaction :message :text) #"^\/[a-z_]+[ ]*" "") nil)
    :msg interaction})
 
 (defn page-button [uuid option page label]
@@ -32,16 +33,17 @@
 (defn result-reply-action-button [status uuid button-data]
   (case status
     :available [{:text "Open in Plex" :url button-data} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :partially-available [{:text "Request More" :callback_data (str "cancel:" uuid ":cancel")} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
     :pending [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
     :processing [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
     :unknown [{:text "Request" :callback_data (str "result-select:" uuid ":" button-data)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]
     (nil) [{:text "Request" :callback_data (str "result-select:" uuid ":" button-data)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]))
 
-(defn result-reply-markup [uuid index count status plex-url?]
-  (let [action-button-data (if (nil? plex-url?) index plex-url?)
+(defn result-reply-markup [uuid index count status tmdb-url plex-url?]
+  (let [action-button-data (or plex-url? index)
         prev (if (= index 0) nil {:text "< Prev" :callback_data (str "change-result:" uuid ":" index "/-1")})
         next (if (= index (dec count)) nil {:text "Next >" :callback_data (str "change-result:" uuid ":" index "/+1")})]
-    (map (partial remove nil?) [[prev {:text "TMDB" :url "https://tmdb.org"} next]
+    (map (partial remove nil?) [[prev {:text "TMDB" :url (or tmdb-url "https://tmdb.org")} next]
                                 (result-reply-action-button status uuid action-button-data)])))
 
 (defn select-option [uuid option-name option]

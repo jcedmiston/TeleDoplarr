@@ -28,12 +28,13 @@
                      :else (impl/seasons-list details))
            :season-count (dec (count seasons))})))))
 
-(defn details [id media-type & {:keys [is-4k? season]}]
+(defn details [id media-type & {:keys [is-4k?]}]
+  ;(impl/media-status details media-type :is-4k? is-4k? :season season)
   (a/go
     (let [details (a/<! (impl/details id media-type))]
-      {:overview (:overview details)
-       :poster (if (nil? (:poster-path details)) "https://critics.io/img/movies/poster-placeholder.png" (str impl/poster-path (:poster-path details)))
-       :status (impl/media-status details media-type :is-4k? is-4k? :season season)
+      {:poster (if (nil? (:poster-path details)) "https://critics.io/img/movies/poster-placeholder.png" (str impl/poster-path (:poster-path details)))
+       :status (impl/media-status details media-type {:is-4k? is-4k? :season -1})
+       :tmdb-url (str "https://themoviedb.org/" (impl/media-type media-type) "/" id)
        :plex-url (-> details :media-info :plex-url)})))
 
 (defn request-embed [{:keys [title id season]} media-type]
