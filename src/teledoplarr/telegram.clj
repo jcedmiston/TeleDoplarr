@@ -45,8 +45,8 @@
        "` has been received!"))
 
 (defn request-commands [media-types]
-  (ches/generate-string (concat [{:command "start" :description "check if the bot is ready to respond."}
-                            {:command "help" :description "help"}]
+  (ches/generate-string (concat [{:command "start" :description "Check if the bot is ready to respond."}
+                            {:command "help" :description "Provides some help for commands."}]
                            (for [media media-types]
                              {:command (name media)
                               :description (str "Request a " (name media))}))))

@@ -22,30 +22,32 @@
     (let [uuid (str (java.util.UUID/randomUUID))
           {:keys [chat-id media-type msg-text]} interaction
           {:keys [bot]} @state/telegram]
-      ; Search for results
-      (info "Performing search for" (name media-type) msg-text)
-      (let [results (->> (log-on-error
-                          (a/<! ((utils/media-fn media-type "search") msg-text media-type))
-                          "Exception from search")
-                         (then #(->> (take (:max-results @state/config telegram/MAX-OPTIONS) %)
-                                     (into []))))
-            result (first results)
-            results-count (count results)
-            {:keys [poster status tmdb-url plex-url]} (a/<! ((utils/media-fn media-type "details") (-> result :id) media-type))]
-        ; Setup ttl cache entry
-        (swap! state/cache assoc uuid {:results results
-                                       :media-type media-type
-                                       :last-modified (System/currentTimeMillis)})
-        (if (empty? results)
-          (->> (utils/check-response (t/send-message bot chat-id (str "Search result returned no hits for " msg-text)))
-               (else #(fatal % "Error in creating no result response")))
-          ; Create dropdown for search results
-          (->> (utils/check-response (t/send-photo bot
-                                                   chat-id
-                                                   poster
-                                                   {:caption (telegram/caption result status 1 results-count)
-                                                    :reply_markup {:inline_keyboard (telegram/result-reply-markup uuid 0 results-count status tmdb-url plex-url)}}))
-               (else #(fatal % "Error in creating search responses"))))))))
+      ;; Search for results
+      (if (not (str/blank? msg-text))
+        ((info "Performing search for" (name media-type) msg-text)
+         (let [results (->> (log-on-error
+                             (a/<! ((utils/media-fn media-type "search") msg-text media-type))
+                             "Exception from search")
+                            (then #(->> (take (:max-results @state/config telegram/MAX-OPTIONS) %)
+                                        (into []))))
+               result (first results)
+               results-count (count results)
+               {:keys [poster status tmdb-url plex-url]} (a/<! ((utils/media-fn media-type "details") (-> result :id) media-type))]
+        ;; Setup ttl cache entry
+           (swap! state/cache assoc uuid {:results results
+                                          :media-type media-type
+                                          :last-modified (System/currentTimeMillis)})
+           (if (empty? results)
+             (->> (utils/check-response (t/send-message bot chat-id (str "Search result returned no hits for " msg-text)))
+                  (else #(fatal % "Error in creating no result response")))
+          ;; Create dropdown for search results
+             (->> (utils/check-response (t/send-photo bot
+                                                      chat-id
+                                                      poster
+                                                      {:caption (telegram/caption result status 1 results-count)
+                                                       :reply_markup {:inline_keyboard (telegram/result-reply-markup uuid 0 results-count status tmdb-url plex-url)}}))
+                  (else #(fatal % "Error in creating search responses"))))))
+        (t/send-message bot chat-id (str "Please provide the name of a " (name media-type) ".\nEx: '/" (name media-type) " The Example " (str/capitalize (name media-type)) "'"))))))
 
 (defmulti process-event! (fn [event _ _ _] event))
 
