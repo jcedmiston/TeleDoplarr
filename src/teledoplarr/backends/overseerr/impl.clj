@@ -104,7 +104,7 @@
   (a/go
     (->> (a/<! (GET (str "/user/" ovsr-id)))
          (then #(->> (utils/from-camel %)
-                     (s/select-one [:body :settings :telegram-id])))
+                     (s/select-one [:body :settings :discord-id])))
          (else #(fatal % "Exception on querying Overseerr Telegram id")))))
 
 (defn telegram-users []

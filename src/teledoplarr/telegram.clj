@@ -74,13 +74,10 @@
                {:name "Root Folder"
                 :value rootfolder})])})
 
-(defn request-performed-plain [payload media-type username]
+(defn request-performed-caption [payload media-type username]
   (str "@" username " your request for the "
        (name media-type) " `" (:title payload) " (" (:year payload) ")"
        "` has been received!"))
-
-(defn request-performed-embed [payload med]
-  (str))
 
 (defn request-commands [media-types]
   (generate-string (concat [{:command "start" :description "check if the bot is ready to respond."}

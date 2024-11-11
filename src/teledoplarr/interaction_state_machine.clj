@@ -134,9 +134,10 @@
                     (t/edit-message-caption bot chat-id msg-id msg))
                    (else #(fatal % "Error in message response"))))]
       (->> (log-on-error
-            (a/<!! ((utils/media-fn media-type "request")
-                    (assoc payload :format (keyword format) :telegram-id user-id)
-                    media-type))
+            (let [telegram-id (utils/zp user-id 19)]
+              (a/<!! ((utils/media-fn media-type "request")
+                      (assoc payload :format (keyword format) :telegram-id telegram-id)
+                      media-type)))
             "Exception from request")
            (then (fn [status]
                    (case status
@@ -146,13 +147,13 @@
                      :available (msg-resp "This selection is already available!")
                      (do
                        (info "Performing request for " payload)
-                       (case (:telegram/requested-msg-style @state/config)
-                         :none nil
-                         :embed (t/edit-message-caption bot chat-id msg-id (telegram/request-performed-embed embed chat-id))
-                         ((t/delete-message bot chat-id msg-id)
-                          (let [length (count (-> interaction :msg :callback_query :from :username))
-                                user (-> interaction :msg :callback_query :from)]
-                            (t/send-message bot chat-id (telegram/request-performed-plain payload media-type (-> user :username)) {:entities [{:type "mention" :offset 0 :length (inc length) :user user}]}))))))))
+                       (let [length (count (-> interaction :msg :callback_query :from :username))
+                             user (-> interaction :msg :callback_query :from)]
+                         (case (:telegram/requested-msg-style @state/config)
+                           :none nil
+                           :embed (t/edit-message-caption bot chat-id msg-id (telegram/request-performed-caption payload media-type (-> user :username)) {:entities [{:type "mention" :offset 0 :length (inc length) :user user}]})
+                           :plain ((t/delete-message bot chat-id msg-id)
+                                   (t/send-message bot chat-id (telegram/request-performed-caption payload media-type (-> user :username)) {:entities [{:type "mention" :offset 0 :length (inc length) :user user}]}))))))))
            (else (fn [e]
                    (let [{:keys [status body] :as data} (ex-data e)]
                      (if (= status 403)
