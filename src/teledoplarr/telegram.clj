@@ -20,8 +20,8 @@
   (case status
     :available [{:text "Open in Plex" :url plex-url?} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
     :partially-available [{:text "Request More" :callback_data (str "result-select:" uuid ":" index)} {:text "Open in Plex" :url plex-url?}]
-    :pending [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
-    :processing [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :pending [{:text "Done" :callback_data (str "cancel-no-response:" uuid ":cancel")}]
+    :processing [{:text "Done" :callback_data (str "cancel-no-response:" uuid ":cancel")}]
     :unknown [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]
     (nil) [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]))
 

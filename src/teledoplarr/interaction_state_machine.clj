@@ -119,6 +119,14 @@
             (t/send-message bot chat-id "Canceled"))
            (else #(fatal % "Error in message response"))))))
 
+(defmethod process-event! "cancel-no-response" [_ interaction _ _]
+  (a/go
+    (let [{:keys [bot]} @state/telegram
+          {:keys [chat-id msg-id]} interaction]
+      (->> (utils/check-response
+            (t/delete-message bot chat-id msg-id))
+           (else #(fatal % "Error in message response"))))))
+
 (defmethod process-event! "option-select" [_ interaction uuid option]
   (let [[opt selection] (str/split option #"/")
         cache-val (swap! state/cache update-in [uuid :pending-opts] #(dissoc % (keyword opt)))]

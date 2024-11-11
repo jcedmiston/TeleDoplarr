@@ -38,7 +38,7 @@
       (not (= nil text))
       (cond
         (str/starts-with? text "/start") (ism/system-interaction! (telegram/interaction-data msg nil) "I'm up and ready to accept requests!")
-        (str/starts-with? text "/help") (ism/system-interaction! (telegram/interaction-data msg nil) "Use '/media' commands to submit requests for new media. If you are using Overserr please make sure your Telegram ID has been added in your account settings.")
+        (str/starts-with? text "/help") (ism/system-interaction! (telegram/interaction-data msg nil) "Use '/movie' & '/series' commands to submit requests for new media..")
         (str/starts-with? text "/movie") (ism/start-interaction! (telegram/interaction-data msg :movie))
         (str/starts-with? text "/series") (ism/start-interaction! (telegram/interaction-data msg :series)))
       (contains? msg :callback_query) (ism/continue-interaction! (telegram/interaction-data msg nil))
