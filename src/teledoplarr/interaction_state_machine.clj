@@ -128,7 +128,7 @@
 (defmethod process-event! "request" [_ interaction uuid format]
   (let [{:keys [chat-id msg-id user-id]} interaction
         {:keys [bot]} @state/telegram
-        {:keys [payload media-type embed]} (get @state/cache uuid)]
+        {:keys [payload media-type]} (get @state/cache uuid)]
     (letfn [(msg-resp [msg]
               (->> (utils/check-response
                     (t/edit-message-caption bot chat-id msg-id msg))

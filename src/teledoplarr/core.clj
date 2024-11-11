@@ -1,15 +1,12 @@
 (ns teledoplarr.core
   (:require
-   [clojure.core.async :as a]
    [clojure.string :as str]
    [config.core :refer [load-env]]
-   [fmnoise.flow :refer [else then]]
    [telegrambot-lib.core :as t]
    [teledoplarr.config :as config]
    [teledoplarr.telegram :as telegram]
    [teledoplarr.interaction-state-machine :as ism]
    [teledoplarr.state :as state]
-   [teledoplarr.utils :as utils :refer [log-on-error]]
    [teledoplarr.status :as status]
    [taoensso.timbre :refer [fatal info] :as timbre]
    [taoensso.timbre.tools.logging :as tlog])
