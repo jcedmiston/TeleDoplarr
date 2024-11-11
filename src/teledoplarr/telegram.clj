@@ -30,21 +30,20 @@
   {:text (apply str (take MAX-CHARACTERS label))
    :callback_data (str "option-page:" uuid ":" option "-" page)})
 
-(defn result-reply-action-button [status uuid button-data]
+(defn result-reply-action-button [status uuid index plex-url?]
   (case status
-    :available [{:text "Open in Plex" :url button-data} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
-    :partially-available [{:text "Request More" :callback_data (str "cancel:" uuid ":cancel")} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :available [{:text "Open in Plex" :url plex-url?} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :partially-available [{:text "Request More" :callback_data (str "result-select:" uuid ":" index)} {:text "Open in Plex" :url plex-url?}]
     :pending [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
     :processing [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
-    :unknown [{:text "Request" :callback_data (str "result-select:" uuid ":" button-data)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]
-    (nil) [{:text "Request" :callback_data (str "result-select:" uuid ":" button-data)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]))
+    :unknown [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]
+    (nil) [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]))
 
 (defn result-reply-markup [uuid index count status tmdb-url plex-url?]
-  (let [action-button-data (or plex-url? index)
-        prev (if (= index 0) nil {:text "< Prev" :callback_data (str "change-result:" uuid ":" index "/-1")})
+  (let [prev (if (= index 0) nil {:text "< Prev" :callback_data (str "change-result:" uuid ":" index "/-1")})
         next (if (= index (dec count)) nil {:text "Next >" :callback_data (str "change-result:" uuid ":" index "/+1")})]
     (map (partial remove nil?) [[prev {:text "TMDB" :url (or tmdb-url "https://tmdb.org")} next]
-                                (result-reply-action-button status uuid action-button-data)])))
+                                (result-reply-action-button status uuid index plex-url?)])))
 
 (defn select-option [uuid option-name option]
   (let [id (-> option :id)]
