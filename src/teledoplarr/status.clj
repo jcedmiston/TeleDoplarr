@@ -9,13 +9,3 @@
   "Sets the update id to process next as the the passed in `id`."
   [id]
   (reset! update-id id))
-
-(defn inc-id!
-  "Increments the update id to process next."
-  []
-  (swap! update-id inc))
-
-(defn next-id
-  "Returns the next update id to process."
-  []
-  (inc @update-id))
