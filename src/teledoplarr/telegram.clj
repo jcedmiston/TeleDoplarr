@@ -33,11 +33,13 @@
 
 (defn select-option [uuid option-name option]
   (let [id (-> option :id)]
-  [{:text (apply str (take MAX-CHARACTERS (or (:title option) (:name option))))
-    :callback_data (str "option-select:" uuid ":" (name option-name) "/" id)}]))
+    [{:text (apply str (take MAX-CHARACTERS (or (:title option) (:name option))))
+      :callback_data (str "option-select:" uuid ":" (name option-name) "/" id)}]))
 
 (defn option-reply-markup [option options uuid]
-  (ches/generate-string {:inline_keyboard (map (partial select-option uuid option) options)}))
+  (let [options-array (map (partial select-option uuid option) options)
+        cancel-button [{:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]]
+  (ches/generate-string {:inline_keyboard (merge options-array cancel-button)})))
 
 (defn request-performed-caption [payload media-type username]
   (str "@" username " your request for the "
@@ -46,10 +48,10 @@
 
 (defn request-commands [media-types]
   (ches/generate-string (concat [{:command "start" :description "Check if the bot is ready to respond."}
-                            {:command "help" :description "Provides some help for commands."}]
-                           (for [media media-types]
-                             {:command (name media)
-                              :description (str "Request a " (name media))}))))
+                                 {:command "help" :description "Provides some help for commands."}]
+                                (for [media media-types]
+                                  {:command (name media)
+                                   :description (str "Request a " (name media))}))))
 
 (defn register-commands [bot media-types]
   (let [commands (request-commands media-types)]
