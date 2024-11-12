@@ -156,7 +156,7 @@
                      :processing (msg-resp "This is currently processing and should be available soon!")
                      :available (msg-resp "This selection is already available!")
                      (do
-                       (info "Performing request for " payload)
+                       (info "Adding request for" (-> payload :title))
                        (let [length (count (-> interaction :msg :callback_query :from :username))
                              user (-> interaction :msg :callback_query :from)]
                          (case (:telegram/requested-msg-style @state/config)
