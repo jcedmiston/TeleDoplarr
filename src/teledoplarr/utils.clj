@@ -62,8 +62,8 @@
        first
        :name))
 
-(defn check-result [res]
-  (if (:ok res )
+(defn check-response [res]
+  (if (:ok res)
     res
     (ex-info "An error occured interacting with telegram" res)))
 
@@ -105,3 +105,8 @@
   (->> (from-camel resp)
        (map #(set/rename-keys % {:label :name}))
        (#(conj % {:name "No Tag" :id -1}))))
+ 
+(defn zp
+  "Zero Pad numbers - takes a number and the length to pad to as arguments"
+  [n c]
+  (format (str "%0" c "d") n))
