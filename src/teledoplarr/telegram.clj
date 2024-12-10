@@ -20,10 +20,10 @@
   (case status
     :available [{:text "Open in Plex" :url plex-url?} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
     :partially-available [{:text "Request More" :callback_data (str "result-select:" uuid ":" index)} {:text "Open in Plex" :url plex-url?}]
-    :pending [{:text "Done" :callback_data (str "cancel-no-response:" uuid ":cancel")}]
-    :processing [{:text "Done" :callback_data (str "cancel-no-response:" uuid ":cancel")}]
-    :unknown [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]
-    (nil) [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]))
+    :pending [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :processing [{:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    :unknown [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]
+    (nil) [{:text "Request" :callback_data (str "result-select:" uuid ":" index)} {:text "Done" :callback_data (str "cancel:" uuid ":cancel")}]))
 
 (defn result-reply-markup [uuid index count status tmdb-url plex-url?]
   (let [prev (if (= index 0) nil {:text "< Prev" :callback_data (str "change-result:" uuid ":" index "/-1")})
@@ -31,15 +31,25 @@
     (map (partial remove nil?) [[prev {:text "TMDB" :url (or tmdb-url "https://tmdb.org")} next]
                                 (result-reply-action-button status uuid index plex-url?)])))
 
+(defn status-dot [status]
+  (case status
+    :available "🟢"
+    :partially-available "🟡"
+    :pending "🟡"
+    :processing "🟡"
+    :unknown ""
+    nil ""))
+
 (defn select-option [uuid option-name option]
   (let [id (-> option :id)]
-    [{:text (apply str (take MAX-CHARACTERS (or (:title option) (:name option))))
-      :callback_data (str "option-select:" uuid ":" (name option-name) "/" id)}]))
+    {:text (apply str (take MAX-CHARACTERS (or (:title option) (str (:name option) " " (status-dot (:status option))))))
+      :callback_data (str "season-select:" uuid ":" (name option-name) "/" id)}))
 
 (defn option-reply-markup [option options uuid]
-  (let [options-array (map (partial select-option uuid option) options)
-        cancel-button [{:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]]
-  (ches/generate-string {:inline_keyboard (merge options-array cancel-button)})))
+  (let [options-array (partition 3 (map (partial select-option uuid option) options))
+        cancel-button [{:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]
+        done-button [{:text "Submit" :callback_data (str "done-season-select:" uuid ":season")}]]
+    (ches/generate-string {:inline_keyboard (conj options-array cancel-button done-button)})))
 
 (defn request-performed-caption [payload media-type username]
   (str "@" username " your request for the "
@@ -47,8 +57,8 @@
        "` has been received!"))
 
 (defn request-commands [media-types]
-  (ches/generate-string (concat [{:command "start" :description "Check if the bot is ready to respond."}
-                                 {:command "help" :description "Provides some help for commands."}]
+  (ches/generate-string (concat [{:command "start" :description "Check if the bot is ready to respond"}
+                                 {:command "help" :description "Provides some help for commands"}]
                                 (for [media media-types]
                                   {:command (name media)
                                    :description (str "Request a " (name media))}))))

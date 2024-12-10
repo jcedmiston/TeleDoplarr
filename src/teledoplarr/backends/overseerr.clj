@@ -32,7 +32,7 @@
   ;(impl/media-status details media-type :is-4k? is-4k? :season season)
   (a/go
     (let [details (a/<! (impl/details id media-type))]
-      {:poster (if (nil? (:poster-path details)) "https://critics.io/img/movies/poster-placeholder.png" (str impl/poster-path (:poster-path details)))
+      {:poster (if (nil? (:poster-path details)) "https://critics.io/img/movies/poster-placeholder.png" (str impl/base-poster-url (:poster-path details)))
        :status (impl/media-status details media-type {:is-4k? is-4k? :season -1})
        :tmdb-url (str "https://themoviedb.org/" (impl/media-type media-type) "/" id)
        :plex-url (-> details :media-info :plex-url)})))
@@ -43,7 +43,7 @@
           details (a/<! (impl/details id media-type))]
       {:title title
        :overview (:overview details)
-       :poster (str impl/poster-path (:poster-path details))
+       :poster (str impl/base-poster-url (:poster-path details))
        :media-type media-type
        :request-formats (cond-> [""] fourk (conj "4K"))
        :season season})))
@@ -64,7 +64,7 @@
                  (assoc :seasons
                         (if (= -1 season)
                           (into [] (range 1 (inc season-count)))
-                          [season])))]
+                          (vec season))))]
       (cond
         (contains? #{:unauthorized :pending :processing :available} status) status
         (and (nil? ovsr-id) (nil? default-id)) :unauthorized

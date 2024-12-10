@@ -11,7 +11,7 @@
 (def base-url (delay (str (:overseerr/url @state/config) "/api/v1")))
 (def api-key  (delay (:overseerr/api @state/config)))
 
-(def poster-path "https://image.tmdb.org/t/p/w500")
+(def base-poster-url "https://image.tmdb.org/t/p/w500")
 
 (def status [:unknown :pending :processing :partially-available :available])
 
@@ -51,12 +51,14 @@
 
 (defn seasons-list [details]
   (conj
-   (for [season (:seasons details)
-         :let [ssn (:season-number season)]
+   (for [season (if (empty? (-> details :media-info :seasons)) (-> details :seasons) (-> details :media-info :seasons))
+         :let [ssn (:season-number season)
+               season-status (status (dec (get-in season [:status] 1)))]
          :when (> ssn 0)]
      {:name (str ssn)
-      :id ssn})
-   {:name "All Seasons" :id -1}))
+      :id ssn
+      :status season-status}) 
+   {:name "All Seasons" :id -1 :status (status 0)}))
 
 (defn backend-4k? [media]
   (a/go

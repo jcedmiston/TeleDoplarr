@@ -24,7 +24,6 @@
    (try
      (t/get-updates bot {:offset offset
                          :timeout 10})
-
      (catch Exception e
        (fatal "tbot/get-updates exception:" e)))))
 
@@ -37,7 +36,7 @@
     (cond
       (not (= nil text))
       (cond
-        (str/starts-with? text "/start") (ism/system-interaction! (telegram/interaction-data msg nil) "I'm up and ready to accept requests!")
+        (str/starts-with? text "/start") (ism/system-interaction! (telegram/interaction-data msg nil) "I'm awake and ready to accept requests!")
         (str/starts-with? text "/help") (ism/system-interaction! (telegram/interaction-data msg nil) "Use '/movie' & '/series' commands to submit requests for new media..")
         (str/starts-with? text "/movie") (ism/start-interaction! (telegram/interaction-data msg :movie))
         (str/starts-with? text "/series") (ism/start-interaction! (telegram/interaction-data msg :series)))
