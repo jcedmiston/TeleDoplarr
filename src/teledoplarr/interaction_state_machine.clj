@@ -12,44 +12,56 @@
 (def channel-timeout 600000)
 
 (defn system-interaction! [interaction msg]
-  (a/go
-    (let [{:keys [chat-id msg-id]} interaction
-          {:keys [bot]} @state/telegram]
-      (t/send-message bot chat-id msg {:reply_to_message_id msg-id}))))
+  (let [{:keys [chat-id msg-id]} interaction
+        {:keys [bot]} @state/telegram]
+    (->> (utils/check-response (t/send-message bot chat-id msg {:reply_to_message_id msg-id}))
+         (else #(fatal % "Error in sending system interaction responses")))))
 
 (defn start-interaction! [interaction]
   (a/go
     (let [uuid (str (java.util.UUID/randomUUID))
           {:keys [chat-id media-type msg-text msg-id]} interaction
           {:keys [bot]} @state/telegram]
-      ;; Search for results
-      (if (not (str/blank? msg-text))
+      (if (str/blank? msg-text)
+        (->> (utils/check-response (t/send-message bot
+                                                   chat-id
+                                                   (str "Please provide the name of a "
+                                                        (name media-type) ".\nEx: '/"
+                                                        (name media-type) " The Example "
+                                                        (str/capitalize (name media-type)) "'")
+                                                   {:reply_to_message_id msg-id}))
+             (else #(fatal % "Error in sending empty message responses")))
         ((info "Performing search for" (name media-type) msg-text)
+         ;; Search for results
          (let [results (->> (log-on-error
                              (a/<! ((utils/media-fn media-type "search") msg-text media-type))
                              "Exception from search")
                             (then #(->> (take (:max-results @state/config telegram/MAX-OPTIONS) %)
-                                        (into []))))
-               result (first results)
-               results-count (count results)
-               {:keys [poster status tmdb-url plex-url]} (a/<! ((utils/media-fn media-type "details") (-> result :id) media-type))]
-        ;; Setup ttl cache entry
-           (swap! state/cache assoc uuid {:org-msg-id msg-id
-                                          :results results
-                                          :media-type media-type
-                                          :last-modified (System/currentTimeMillis)})
+                                        (into []))))]
            (if (empty? results)
-             (->> (utils/check-response (t/send-message bot chat-id (str "Search result returned no hits for " msg-text)))
-                  (else #(fatal % "Error in creating no result response")))
-          ;; Create dropdown for search results
-             (->> (utils/check-response (t/send-photo bot
-                                                      chat-id
-                                                      poster
-                                                      {:caption (telegram/caption result status 1 results-count)
-                                                       :reply_markup {:inline_keyboard (telegram/result-reply-markup uuid 0 results-count status tmdb-url plex-url)}
-                                                       :reply_to_message_id msg-id}))
-                  (else #(fatal % "Error in creating search responses"))))))
-        (t/send-message bot chat-id (str "Please provide the name of a " (name media-type) ".\nEx: '/" (name media-type) " The Example " (str/capitalize (name media-type)) "'"))))))
+             (->> (utils/check-response (t/send-message bot
+                                                        chat-id
+                                                        (str "Search result returned no hits for " msg-text)
+                                                        {:reply_to_message_id msg-id}))
+                  (else #(fatal % "Error in sending no result response")))
+             (let [result (first results)
+                   results-count (count results)
+                   {:keys [poster status tmdb-url plex-url]} (log-on-error
+                                                              (a/<! ((utils/media-fn media-type "details") (:id result) media-type))
+                                                              "Exception from details")]
+               ;; Setup ttl cache entry
+               (swap! state/cache assoc uuid {:org-msg-id msg-id
+                                              :results results
+                                              :media-type media-type
+                                              :last-modified (System/currentTimeMillis)})
+               ;; Create message for search results
+               (->> (utils/check-response (t/send-photo bot
+                                                        chat-id
+                                                        poster
+                                                        {:caption (telegram/caption result status 1 results-count)
+                                                         :reply_markup {:inline_keyboard (telegram/result-reply-markup uuid 0 results-count status tmdb-url plex-url)}
+                                                         :reply_to_message_id msg-id}))
+                    (else #(fatal % "Error in sending search responses")))))))))))
 
 (defmulti process-event! (fn [event _ _ _ _] event))
 
@@ -143,11 +155,11 @@
 (defn update-text-by-id [collection id]
   (mapv (fn [item]
           (let [current-name (-> item :name)]
-          (if (= (:id item) id)
-            (if (str/includes? current-name "✅")
-              (assoc item :name (str id))
-              (assoc item :name (str id " ✅")))
-            item)))
+            (if (= (:id item) id)
+              (if (str/includes? current-name "✅")
+                (assoc item :name (str id))
+                (assoc item :name (str id " ✅")))
+              item)))
         collection))
 
 (defmethod process-event! "season-select" [_ interaction uuid option callback-id]
@@ -156,9 +168,9 @@
     (swap! state/cache update-in [uuid :payload (keyword opt)] (fnil toggle-item []) (Integer/parseInt selection))
     (swap! state/cache update-in [uuid :pending-opts (keyword opt)] update-text-by-id (Integer/parseInt selection))
     ; Send the ack
-    (let [notification-text-end (if (some #(= % (Integer/parseInt selection)) 
-                                          (-> (get @state/cache uuid) :payload :season)) 
-                                  " selected!" 
+    (let [notification-text-end (if (some #(= % (Integer/parseInt selection))
+                                          (-> (get @state/cache uuid) :payload :season))
+                                  " selected!"
                                   " removed!")]
       (->> (utils/check-response
             (t/answer-callback-query bot callback-id {:text (str opt " " selection notification-text-end)}))
