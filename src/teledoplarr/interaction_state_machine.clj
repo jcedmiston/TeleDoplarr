@@ -31,13 +31,12 @@
                                                         (str/capitalize (name media-type)) "'")
                                                    {:reply_to_message_id msg-id}))
              (else #(fatal % "Error in sending empty message responses")))
-        ((info "Performing search for" (name media-type) msg-text)
-         ;; Search for results
-         (let [results (->> (log-on-error
+        (let [results (->> (log-on-error
                              (a/<! ((utils/media-fn media-type "search") msg-text media-type))
                              "Exception from search")
                             (then #(->> (take (:max-results @state/config telegram/MAX-OPTIONS) %)
                                         (into []))))]
+           (info "Performing search for" (name media-type) msg-text)
            (if (empty? results)
              (->> (utils/check-response (t/send-message bot
                                                         chat-id
@@ -61,7 +60,7 @@
                                                         {:caption (telegram/caption result status 1 results-count)
                                                          :reply_markup {:inline_keyboard (telegram/result-reply-markup uuid 0 results-count status tmdb-url plex-url)}
                                                          :reply_to_message_id msg-id}))
-                    (else #(fatal % "Error in sending search responses")))))))))))
+                    (else #(fatal % "Error in sending search responses"))))))))))
 
 (defmulti process-event! (fn [event _ _ _ _] event))
 
