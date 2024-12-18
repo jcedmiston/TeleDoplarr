@@ -32,37 +32,43 @@
                                                    {:reply_to_message_id msg-id}))
              (else #(fatal % "Error in sending empty message responses")))
         (let [results (->> (log-on-error
-                             (a/<! ((utils/media-fn media-type "search") msg-text media-type))
-                             "Exception from search")
-                            (then #(->> (take (:max-results @state/config telegram/MAX-OPTIONS) %)
-                                        (into []))))]
-           (info "Performing search for" (name media-type) msg-text)
-           (if (empty? results)
-             (->> (utils/check-response (t/send-message bot
-                                                        chat-id
-                                                        (str "Search result returned no hits for " msg-text)
-                                                        {:reply_to_message_id msg-id}))
-                  (else #(fatal % "Error in sending no result response")))
-             (let [result (first results)
-                   results-count (count results)
-                   {:keys [poster status tmdb-url plex-url]} (log-on-error
-                                                              (a/<! ((utils/media-fn media-type "details") (:id result) media-type))
-                                                              "Exception from details")]
+                            (a/<! ((utils/media-fn media-type "search") msg-text media-type))
+                            "Exception from search")
+                           (then #(->> (take (:max-results @state/config telegram/MAX-OPTIONS) %)
+                                       (into []))))]
+          (info "Performing search for" (name media-type) msg-text)
+          (if (empty? results)
+            (->> (utils/check-response (t/send-message bot
+                                                       chat-id
+                                                       (str "Search result returned no hits for " msg-text)
+                                                       {:reply_to_message_id msg-id}))
+                 (else #(fatal % "Error in sending no result response")))
+            (let [result (first results)
+                  results-count (count results)
+                  {:keys [poster status tmdb-url plex-url]} (log-on-error
+                                                             (a/<! ((utils/media-fn media-type "details") (:id result) media-type))
+                                                             "Exception from details")]
                ;; Setup ttl cache entry
-               (swap! state/cache assoc uuid {:org-msg-id msg-id
-                                              :results results
-                                              :media-type media-type
-                                              :last-modified (System/currentTimeMillis)})
+              (swap! state/cache assoc uuid {:org-msg-id msg-id
+                                             :results results
+                                             :media-type media-type
+                                             :last-modified (System/currentTimeMillis)})
                ;; Create message for search results
-               (->> (utils/check-response (t/send-photo bot
-                                                        chat-id
-                                                        poster
-                                                        {:caption (telegram/caption result status 1 results-count)
-                                                         :reply_markup {:inline_keyboard (telegram/result-reply-markup uuid 0 results-count status tmdb-url plex-url)}
-                                                         :reply_to_message_id msg-id}))
-                    (else #(fatal % "Error in sending search responses"))))))))))
+              (->> (utils/check-response (t/send-photo bot
+                                                       chat-id
+                                                       poster
+                                                       {:caption (telegram/caption result status 1 results-count)
+                                                        :reply_markup {:inline_keyboard (telegram/result-reply-markup uuid 0 results-count status tmdb-url plex-url)}
+                                                        :reply_to_message_id msg-id}))
+                   (else #(fatal % "Error in sending search responses"))))))))))
 
 (defmulti process-event! (fn [event _ _ _ _] event))
+
+(defn send-ack [callback-id & [text]]
+  (let [{:keys [bot]} @state/telegram]
+    (->> (utils/check-response
+          (t/answer-callback-query bot callback-id (if text {:text text} {})))
+         (else #(fatal % "Error sending response ack")))))
 
 (defn query-for-option-or-request [pending-opts interaction uuid]
   (a/go
@@ -97,6 +103,7 @@
                             (filter #(seq? (second %)))
                             (into {}))
           ready-opts (apply (partial dissoc add-opts) (keys pending-opts))]
+      (send-ack callback-id nil)
       ; Start setting up the payload
       (swap! state/cache assoc-in [uuid :payload] result)
       (swap! state/cache assoc-in [uuid :pending-opts] pending-opts)
@@ -114,6 +121,7 @@
           results-count (count results)
           result (nth results index)
           {:keys [poster status tmdb-url plex-url]} (a/<! ((utils/media-fn media-type "details") (-> result :id) media-type))]
+      (send-ack callback-id nil)
       (->> (utils/check-response
             (t/edit-message-media bot
                                   chat-id
@@ -129,10 +137,7 @@
     (let [{:keys [bot]} @state/telegram
           {:keys [chat-id msg-id]} interaction
           {:keys [org-msg-id]} (get @state/cache uuid)]
-      ; Send the ack
-      (->> (utils/check-response
-            (t/answer-callback-query bot callback-id {:text "Request Cancelled!"}))
-           (else #(fatal % "Error sending response ack")))
+      (send-ack callback-id "Request cancelled")
       (->> (utils/check-response
             (t/delete-message bot chat-id org-msg-id))
            (else #(fatal % "Error in message response")))
@@ -144,46 +149,34 @@
   (let [[opt selection] (str/split option #"/")
         cache-val (swap! state/cache update-in [uuid :pending-opts] #(dissoc % (keyword opt)))]
     (swap! state/cache assoc-in [uuid :payload (keyword opt)] (Integer/parseInt selection))
+    (send-ack callback-id "Selection submitted")
     (query-for-option-or-request (get-in cache-val [uuid :pending-opts]) interaction uuid)))
 
-(defn toggle-item [coll item]
-  (if (some #(= % item) coll)
-    (remove #(= % item) coll)  ; Remove the item if it's present
-    (conj coll item)))         ; Add the item if it's not present
-
-(defn update-text-by-id [collection id]
-  (mapv (fn [item]
-          (let [current-name (-> item :name)]
-            (if (= (:id item) id)
-              (if (str/includes? current-name "✅")
-                (assoc item :name (str id))
-                (assoc item :name (str id " ✅")))
-              item)))
-        collection))
-
 (defmethod process-event! "season-select" [_ interaction uuid option callback-id]
-  (let [[opt selection] (str/split option #"/")
-        {:keys [bot]} @state/telegram]
-    (swap! state/cache update-in [uuid :payload (keyword opt)] (fnil toggle-item []) (Integer/parseInt selection))
-    (swap! state/cache update-in [uuid :pending-opts (keyword opt)] update-text-by-id (Integer/parseInt selection))
+  (let [[opt selection] (str/split option #"/")]
+    (swap! state/cache update-in [uuid :payload (keyword opt)] (fnil utils/toggle-item []) (Integer/parseInt selection))
+    (swap! state/cache update-in [uuid :pending-opts (keyword opt)] utils/update-text-by-id (Integer/parseInt selection))
     ; Send the ack
     (let [notification-text-end (if (some #(= % (Integer/parseInt selection))
                                           (-> (get @state/cache uuid) :payload :season))
-                                  " selected!"
-                                  " removed!")]
-      (->> (utils/check-response
-            (t/answer-callback-query bot callback-id {:text (str opt " " selection notification-text-end)}))
-           (else #(fatal % "Error sending response ack"))))
-    (query-for-option-or-request (-> (get @state/cache uuid) :pending-opts) interaction uuid)))
+                                  " selected"
+                                  " removed")]
+      (send-ack callback-id (str opt " " selection notification-text-end)))
+    (query-for-option-or-request (:pending-opts (get @state/cache uuid)) interaction uuid)))
 
-(defmethod process-event! "done-season-select" [_ interaction uuid option]
-  (let [cache-val (swap! state/cache update-in [uuid :pending-opts] #(dissoc % (keyword option)))]
-    (query-for-option-or-request (get-in cache-val [uuid :pending-opts]) interaction uuid)))
+(defmethod process-event! "submit-seasons" [_ interaction uuid option callback-id]
+  (let [season-selection (-> (get @state/cache uuid) :payload :season)]
+    (if (empty? season-selection)
+      (send-ack callback-id "Select at least 1 season")
+      (let [cache-val (swap! state/cache update-in [uuid :pending-opts] #(dissoc % (keyword option)))]
+        (send-ack callback-id "Selection submitted")
+        (query-for-option-or-request (get-in cache-val [uuid :pending-opts]) interaction uuid)))))
 
 (defmethod process-event! "request" [_ interaction uuid format callback-id]
   (let [{:keys [chat-id msg-id user-id]} interaction
         {:keys [bot]} @state/telegram
         {:keys [payload media-type org-msg-id]} (get @state/cache uuid)]
+    (send-ack callback-id nil)
     (->> (utils/check-response
           (t/delete-message bot chat-id org-msg-id))
          (else #(fatal % "Error in message response")))
@@ -199,10 +192,7 @@
             "Exception from request")
            (then (fn [status]
                    (case status
-                     :unauthorized (msg-resp "You are unauthorized to perform this request. Please contact your system administrator for more help.")
-                     :pending (msg-resp "This has already been requested and the request is pending")
-                     :processing (msg-resp "This is currently processing and should be available soon!")
-                     :available (msg-resp "This selection is already available!")
+                     :unauthorized (msg-resp "You are not authorized to perform this request. Please contact your system administrator for more help.")
                      (do
                        (info "Adding request for" (-> payload :title))
                        (let [length (count (-> interaction :msg :callback_query :from :username))
@@ -227,11 +217,6 @@
         [event uuid option] (str/split (-> interaction :msg :callback_query :data) #":")
         callback-id (-> interaction :msg :callback_query :id)
         now (System/currentTimeMillis)]
-    ; Send the ack
-    ;(->> (utils/check-response
-    ;      (t/answer-callback-query bot callback-id))
-    ;     (else #(fatal % "Error sending response ack")))
-    ; Check last modified
     (if-let [{:keys [last-modified]} (get @state/cache uuid)]
       (if (> (- now last-modified) channel-timeout)
         ; Update interaction with timeout message
