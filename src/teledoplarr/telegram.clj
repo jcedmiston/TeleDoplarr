@@ -8,7 +8,7 @@
 (def MAX-CHARACTERS 100)
 
 (defn interaction-data [interaction media-type]
-  {:id (-> interaction :update_id)
+  {:id (:update_id interaction)
    :chat-id (get-in interaction [:callback_query :message :chat :id] (-> interaction :message :chat :id))
    :media-type media-type
    :user-id (get-in interaction [:callback_query :from :id] (-> interaction :message :from :id))
@@ -37,34 +37,27 @@
     :partially-available "🟡"
     :pending "🟡"
     :processing "🟡"
-    :unknown ""
-    nil ""))
+    ""))
 
 (defn select-option [uuid option-name option]
-  (let [id (-> option :id)]
-    {:text (apply str (take MAX-CHARACTERS (or (:title option) (str (:name option) " " (status-dot (:status option))))))
-      :callback_data (str "season-select:" uuid ":" (name option-name) "/" id)}))
+  {:text (apply str (take MAX-CHARACTERS (or (:title option) (str (:name option) " " (status-dot (:status option))))))
+   :callback_data (str "season-select:" uuid ":" (name option-name) "/" (:id option))})
 
 (defn option-reply-markup [option options uuid]
-  (let [options-array (partition 3 (map (partial select-option uuid option) options))
+  (let [all-season-option (first options)
+        all-season-button [{:text (apply str (take MAX-CHARACTERS (or (:title all-season-option) (str (:name all-season-option) " " (status-dot (:status all-season-option))))))
+                            :callback_data (str "option-select:" uuid ":" (name option) "/" (:id all-season-option))}]
+        options-array (partition-all 3 (map (partial select-option uuid option) (rest options)))
         cancel-button [{:text "Cancel" :callback_data (str "cancel:" uuid ":cancel")}]
-        done-button [{:text "Submit" :callback_data (str "done-season-select:" uuid ":season")}]]
-    (ches/generate-string {:inline_keyboard (conj options-array cancel-button done-button)})))
-
-(defn request-performed-caption [payload media-type username]
-  (str "@" username " your request for the "
-       (name media-type) " `" (:title payload) " (" (:year payload) ")"
-       "` has been received!"))
-
-(defn request-commands [media-types]
-  (ches/generate-string (concat [{:command "start" :description "Check if the bot is ready to respond"}
-                                 {:command "help" :description "Provides some help for commands"}]
-                                (for [media media-types]
-                                  {:command (name media)
-                                   :description (str "Request a " (name media))}))))
+        done-button [{:text "Submit" :callback_data (str "submit-seasons:" uuid ":season")}]]
+    (ches/generate-string {:inline_keyboard (conj options-array all-season-button cancel-button done-button)})))
 
 (defn register-commands [bot media-types]
-  (let [commands (request-commands media-types)]
+  (let [commands (ches/generate-string (concat [{:command "start" :description "Check if the bot is ready to respond"}
+                                                {:command "help" :description "Provides some help for commands"}]
+                                               (for [media media-types]
+                                                 {:command (name media)
+                                                  :description (str "Request a " (name media))})))]
     (t/set-my-commands bot commands)))
 
 (defn status-pill [status]
@@ -75,6 +68,11 @@
     :processing "🟡 Proccessing Request"
     :unknown "🔴 Not Yet Available"
     nil "🔴 Not Yet Available"))
+
+(defn request-performed-caption [payload media-type username]
+  (str "@" username " your request for the "
+       (name media-type) " `" (:title payload) " (" (:year payload) ")"
+       "` has been received!"))
 
 (defn caption [result status index results-count]
   (str (:title result) " ("
