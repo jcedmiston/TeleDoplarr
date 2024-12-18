@@ -105,8 +105,23 @@
   (->> (from-camel resp)
        (map #(set/rename-keys % {:label :name}))
        (#(conj % {:name "No Tag" :id -1}))))
- 
+
 (defn zp
   "Zero Pad numbers - takes a number and the length to pad to as arguments"
   [n c]
   (format (str "%0" c "d") n))
+
+(defn toggle-item [coll item]
+  (if (some #(= % item) coll)
+    (remove #(= % item) coll)  ; Remove the item if it's present
+    (conj coll item)))         ; Add the item if it's not present
+
+(defn update-text-by-id [collection id]
+  (mapv (fn [item]
+          (let [current-name (-> item :name)]
+            (if (= (:id item) id)
+              (if (str/includes? current-name "✅")
+                (assoc item :name (str id))
+                (assoc item :name (str id " ✅")))
+              item)))
+        collection))
